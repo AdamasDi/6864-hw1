@@ -200,9 +200,11 @@ Then, use the code to set up experiments that answer the following questions:
 # Part 2: Word representations via language modeling
 # ----------------------------------------------------------------------------------------------------------------------
 """
-In this section, we'll train a word embedding model with a word2vec-style objective rather than a matrix factorization objective. This requires a little more work; we've provided scaffolding for a PyTorch model implementation below.
-(If you've never used PyTorch before, there are some tutorials [here](https://pytorch.org/tutorials/). You're also welcome to implement these experiments in
-any other framework of your choosing.)
+In this section, we'll train a word embedding model with a word2vec-style objective rather than a matrix 
+factorization objective. This requires a little more work; we've provided scaffolding for a PyTorch model 
+implementation below.
+(If you've never used PyTorch before, there are some tutorials [here](https://pytorch.org/tutorials/). 
+You're also welcome to implement these experiments in any other framework of your choosing.)
 """
 
 import torch
@@ -212,50 +214,50 @@ import torch.optim as optim
 import torch.utils.data as torch_data
 
 class Word2VecModel(nn.Module):
-  # A torch module implementing a word2vec predictor. The `forward` function
-  # should take a batch of context word ids as input and predict the word 
-  # in the middle of the context as output, as in the CBOW model from lecture.
+    # A torch module implementing a word2vec predictor. The `forward` function
+    # should take a batch of context word ids as input and predict the word
+    # in the middle of the context as output, as in the CBOW model from lecture.
 
-  def __init__(self, vocab_size, embed_dim):
-      super().__init__()
+    def __init__(self, vocab_size, embed_dim):
+        super().__init__()
 
-      # Your code here!
+        # Your code here!
 
-  def forward(self, context):
-      # Context is an `n_batch x n_context` matrix of integer word ids
-      # this function should return a set of scores for predicting the word 
-      # in the middle of the context
+     def forward(self, context):
+        # Context is an `n_batch x n_context` matrix of integer word ids
+        # this function should return a set of scores for predicting the word
+        # in the middle of the context
 
-      # Your code here!
+        # Your code here!
 
 def learn_reps_word2vec(corpus, window_size, rep_size, n_epochs, n_batch):
-  # This method takes in a corpus of training sentences. It returns a matrix of
-  # word embeddings with the same structure as used in the previous section of 
-  # the assignment. (You can extract this matrix from the parameters of the 
-  # Word2VecModel.)
+    # This method takes in a corpus of training sentences. It returns a matrix of
+    # word embeddings with the same structure as used in the previous section of
+    # the assignment. (You can extract this matrix from the parameters of the
+    # Word2VecModel.)
 
-  tokenizer = lab_util.Tokenizer()
-  tokenizer.fit(corpus)
-  tokenized_corpus = tokenizer.tokenize(corpus)
+    tokenizer = lab_util.Tokenizer()
+    tokenizer.fit(corpus)
+    tokenized_corpus = tokenizer.tokenize(corpus)
 
-  ngrams = lab_util.get_ngrams(tokenized_corpus, window_size)
+    ngrams = lab_util.get_ngrams(tokenized_corpus, window_size)
 
-  device = torch.device('cuda')  # run on colab gpu
-  model = Word2VecModel(tokenizer.vocab_size, rep_size).to(device)
-  opt = optim.Adam(model.parameters(), lr=0.001)
-  loss_fn = None # Your code here
+    device = torch.device('cuda')  # run on colab gpu
+    model = Word2VecModel(tokenizer.vocab_size, rep_size).to(device)
+    opt = optim.Adam(model.parameters(), lr=0.001)
+    loss_fn = None # Your code here
 
-  loader = torch_data.DataLoader(ngrams, batch_size=n_batch, shuffle=True)
+    loader = torch_data.DataLoader(ngrams, batch_size=n_batch, shuffle=True)
 
-  for epoch in range(n_epochs):
-    for context, label in loader:
-      # as described above, `context` is a batch of context word ids, and
-      # `label` is a batch of predicted word labels
-      pass
-      # Your code here!
+    for epoch in range(n_epochs):
+        for context, label in loader:
+        # as described above, `context` is a batch of context word ids, and
+        # `label` is a batch of predicted word labels
+            pass
+        # Your code here!
 
   # reminder: you want to return a `vocab_size x embedding_size` numpy array
-  embedding_matrix = None
+    embedding_matrix = None
   # Your code here!
 
 reps_word2vec = learn_reps_word2vec(train_reviews, 2, 500, 10, 100)
@@ -274,29 +276,34 @@ np.random.shuffle(zipped)
 zipped = zipped[:100]
 zipped = sorted(zipped, key=lambda x: x[1])
 for token, cluster_idx in zipped:
-  word = vectorizer.tokenizer.token_to_word[token]
-  print(f"{word}: {cluster_idx}")
+    word = vectorizer.tokenizer.token_to_word[token]
+    print(f"{word}: {cluster_idx}")
 
-"""Finally, we can use the trained word embeddings to construct vector representations of full reviews. One common approach is to simply average all the word embeddings in the review to create an overall embedding. Implement the transform function in Word2VecFeaturizer to do this."""
+"""Finally, we can use the trained word embeddings to construct vector representations of full reviews. 
+One common approach is to simply average all the word embeddings in the review to create an overall embedding. 
+Implement the transform function in Word2VecFeaturizer to do this."""
 
 def lsa_featurizer(xs):
-  feats = None # Your code here!
+    feats = None # Your code here!
 
   # normalize
-  return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
+    return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
 
 training_experiment("word2vec", lsa_featurizer, 10)
 
 """**Part 2: Lab writeup**
 
-Part 2 of your lab report should discuss any implementation details that were important to filling out the code above. Then, use the code to set up experiments that answer the following questions:
+Part 2 of your lab report should discuss any implementation details that were important to filling out the code above. 
+Then, use the code to set up experiments that answer the following questions:
 
-1. Qualitatively, what do you observe about nearest neighbors in representation space? (E.g. what words are most similar to _the_, _dog_, _3_, and _good_?) How well do word2vec representations correspond to your intuitions about word similarity?
+1. Qualitatively, what do you observe about nearest neighbors in representation space? 
+(E.g. what words are most similar to _the_, _dog_, _3_, and _good_?)
+How well do word2vec representations correspond to your intuitions about word similarity?
 
-2. One important parameter in word2vec-style models is context size. How does changing the context size affect the kinds of representations that are learned?
+2. One important parameter in word2vec-style models is context size. 
+How does changing the context size affect the kinds of representations that are learned?
 
-3. How do results on the downstream classification problem compare to 
-   part 1?
+3. How do results on the downstream classification problem compare to part 1?
 
 4. What are some advantages and disadvantages of learned embedding representations, relative to the featurization done in part 1?
 
