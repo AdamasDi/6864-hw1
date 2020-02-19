@@ -2,45 +2,53 @@ import csv
 import itertools as it
 import numpy as np
 np.random.seed(0)
-
 import lab_util
+import sklearn.decomposition as skd
 
-"""## Introduction
+'''
+## Introduction
 
-In this lab, you'll explore three different ways of using unlabeled text data to learn pretrained word representations. Your lab report will describe the effects of different modeling decisions (representation learning objective, context size, etc.) on both qualitative properties of learned representations and their effect on a downstream prediction problem.
+In this lab, you'll explore three different ways of using unlabeled text data to learn pretrained word representations. 
+Your lab report will describe the effects of different modeling decisions (representation learning objective, 
+context size, etc.) on both qualitative properties of learned representations and their effect on a downstream prediction problem.
 
 **General lab report guidelines**
-
-Homework assignments should be submitted in the form of a research report. (We'll be providing a place to upload them before the due date, but are still sorting out some logistics.) Please upload PDFs, with a maximum of four single-spaced pages. (If you want you can use the [Association for Computational Linguistics style files](http://acl2020.org/downloads/acl2020-templates.zip).) Reports should have one section for each part of the homework assignment below. Each section should describe the details of your code implementation, and include whatever charts / tables are necessary to answer the set of questions at the end of the corresponding homework part.
+Homework assignments should be submitted in the form of a research report. (We'll be providing a place to upload them 
+before the due date, but are still sorting out some logistics.) Please upload PDFs, with a maximum of four 
+single-spaced pages. (If you want you can use the [Association for Computational Linguistics style files]
+(http://acl2020.org/downloads/acl2020-templates.zip).) Reports should have one section for each part of the homework 
+assignment below. Each section should describe the details of your code implementation, and include whatever charts / 
+tables are necessary to answer the set of questions at the end of the corresponding homework part.
 
 We're going to be working with a dataset of product reviews. It looks like this:
-"""
+'''
+# ----------------------------------------------------------------------------------------------------------------------
+# Part 1: Initial Data
+# ----------------------------------------------------------------------------------------------------------------------
 
 data = []
 n_positive = 0
 n_disp = 0
-with open("/content/6864-hw1/reviews.csv") as reader:
-  csvreader = csv.reader(reader)
-  next(csvreader)
-  for id, review, label in csvreader:
-    label = int(label)
-
+with open("./reviews.csv") as reader:
+    csvreader = csv.reader(reader)
+    next(csvreader)
+    for id, review, label in csvreader:
+        label = int(label)
     # hacky class balancing
-    if label == 1:
-      if n_positive == 2000:
-        continue
-      n_positive += 1
-    if len(data) == 4000:
-      break
-
-    data.append((review, label))
+        if label == 1:
+            if n_positive == 2000:
+                continue
+            n_positive += 1
+        if len(data) == 4000:
+            break
+        data.append((review, label))
     
-    if n_disp > 5:
-      continue
-    n_disp += 1
-    print("review:", review)
-    print("rating:", label, "(good)" if label == 1 else "(bad)")
-    print()
+        if n_disp > 5:
+            continue
+        n_disp += 1
+        print("review:", review)
+        print("rating:", label, "(good)" if label == 1 else "(bad)")
+        print()
 
 print(f"Read {len(data)} total reviews.")
 np.random.shuffle(data)
@@ -52,51 +60,66 @@ val_labels = labels[3000:3500]
 test_reviews = reviews[3500:]
 test_labels = labels[3500:]
 
-"""We've provided a little bit of helper code for reading in the dataset; your job is to implement the learning!
-
-## Part 1: word representations via matrix factorization
-
-First, we'll construct the term--document matrix (look at `/content/6864-hw1/lab_util.py` in the file browser on the left if you want to see how this works).
-"""
+# ----------------------------------------------------------------------------------------------------------------------
+# Part 1: Word representations via matrix factorization
+# ----------------------------------------------------------------------------------------------------------------------
+'''
+First, we'll construct the term--document matrix (look at `/content/6864-hw1/lab_util.py` in the file browser on the 
+left if you want to see how this works).
+'''
 
 vectorizer = lab_util.CountVectorizer()
 vectorizer.fit(train_reviews)
 td_matrix = vectorizer.transform(train_reviews).T
-print(f"TD matrix is {td_matrix.shape[0]} x {td_matrix.shape[1]}")
+print(f"TD matrix is {td_matrix.shape[0]} x {td_matrix.shape[1]}")  # (2006, 3000)
 
-"""First, implement a function that computes word representations via latent semantic analysis:"""
+'''
+First, implement a function that computes word representations via latent semantic analysis:
+'''
 
 def learn_reps_lsa(matrix, rep_size):
-  # `matrix` is a `|V| x n` matrix, where `|V|` is the number of words in the
-  # vocabulary. This function should return a `|V| x rep_size` matrix with each
-  # row corresponding to a word representation. The `sklearn.decomposition` 
-  # package may be useful.
-
-  # Your code here!
+    # `matrix` is a `|V| x n` matrix, where `|V|` is the number of words in the
+    # vocabulary. This function should return a `|V| x rep_size` matrix with each
+    # row corresponding to a word representation. The `sklearn.decomposition`
+    # package may be useful.
+    svd = skd.TruncatedSVD(n_components=rep_size)
+    svd.fit(matrix.T)
+    output = svd.components_
+    return output.T
 
 """Let's look at some representations:"""
 
-reps = learn_reps_lsa(td_matrix, 500)
+reps = learn_reps_lsa(td_matrix.copy(), 500)   # (n_word, rep_size)
 words = ["good", "bad", "cookie", "jelly", "dog", "the", "4"]
 show_tokens = [vectorizer.tokenizer.word_to_token[word] for word in words]
 lab_util.show_similar_words(vectorizer.tokenizer, reps, show_tokens)
 
-"""We've been operating on the raw count matrix, but in class we discussed several reweighting schemes aimed at making LSA representations more informative. 
+'''
+We've been operating on the raw count matrix, but in class we discussed several reweighting schemes aimed at making LSA 
+representations more informative. 
 
 Here, implement the TF-IDF transform and see how it affects learned representations.
-"""
+'''
 
 def transform_tfidf(matrix):
-  # `matrix` is a `|V| x |D|` matrix of raw counts, where `|V|` is the 
-  # vocabulary size and `|D|` is the number of documents in the corpus. This
-  # function should (nondestructively) return a version of `matrix` with the
-  # TF-IDF transform appliied.
-
-  # Your code here!
+    # `matrix` is a `|V| x |D|` matrix of raw counts, where `|V|` is the
+    # vocabulary size and `|D|` is the number of documents in the corpus. This
+    # function should (nondestructively) return a version of `matrix` with the
+    # TF-IDF transform appliied.
+    # matrix = td_matrix.copy()
+    tfidf = np.zeros(matrix.shape)
+    n_word = matrix.shape[0]
+    n_doc = matrix.shape[1]
+    for i in range(n_word):
+        i_doc = matrix[i, :]
+        i_doc[i_doc > 0] = 1
+        n_doc_i = i_doc.sum()
+        tfidf[i, :] = matrix[i, :] * np.log(n_doc / n_doc_i)
+    return tfidf
 
 """How does this change the learned similarity function?"""
 
-td_matrix_tfidf = transform_tfidf(td_matrix)
+td_matrix_tfidf = transform_tfidf(td_matrix.copy())
 reps_tfidf = learn_reps_lsa(td_matrix_tfidf, 500)
 lab_util.show_similar_words(vectorizer.tokenizer, reps_tfidf, show_tokens)
 
@@ -105,7 +128,8 @@ lab_util.show_similar_words(vectorizer.tokenizer, reps_tfidf, show_tokens)
 Below, implement a feature function that represents a document as the sum of its
 learned word embeddings.
 
-The remaining code trains a logistic regression model on a set of *labeled* reviews; we're interested in seeing how much representations learned from *unlabeled* reviews improve classification.
+The remaining code trains a logistic regression model on a set of *labeled* reviews; 
+we're interested in seeing how much representations learned from *unlabeled* reviews improve classification.
 """
 
 def word_featurizer(xs):
@@ -117,9 +141,7 @@ def lsa_featurizer(xs):
   # for the given review. It should return a matrix in which each row contains
   # the learned feature representation of each review (e.g. the sum of LSA 
   # word representations).
-
-  feats = None # Your code here!
-
+  feats = transform_tfidf(xs).copy() # Your code here!
   # normalize
   return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
 
@@ -154,12 +176,13 @@ training_experiment("combo", combo_featurizer, 10)
 
 """**Part 1: Lab writeup**
 
-Part 1 of your lab report should discuss any implementation details that were important to filling out the code above. Then, use the code to set up experiments that answer the following questions:
+Part 1 of your lab report should discuss any implementation details that were important to filling out the code above. 
+Then, use the code to set up experiments that answer the following questions:
 
-1. Qualitatively, what do you observe about nearest neighbors in representation    space? (E.g. what words are most similar to _the_, _dog_, _3_, and _good_?)
+1. Qualitatively, what do you observe about nearest neighbors in representation space? 
+(E.g. what words are most similar to _the_, _dog_, _3_, and _good_?)
 
 2. How does the size of the LSA representation affect this behavior?
-
 
 3. Recall that the we can compute the word co-occurrence matrix $W_{tt} = W_    
    {td} W_{td}^\top$. What can you prove about the relationship between the    
@@ -170,10 +193,13 @@ Part 1 of your lab report should discuss any implementation details that were im
    is the relationship between the number of labeled examples and the effect of
    word embeddings?
    
-5. What is the relationship between the size of the word embeddings and their      usefulness for the classification task.
+5. What is the relationship between the size of the word embeddings and their usefulness for the classification task.
+"""
 
-## Part 2: word representations via language modeling
-
+# ----------------------------------------------------------------------------------------------------------------------
+# Part 2: Word representations via language modeling
+# ----------------------------------------------------------------------------------------------------------------------
+"""
 In this section, we'll train a word embedding model with a word2vec-style objective rather than a matrix factorization objective. This requires a little more work; we've provided scaffolding for a PyTorch model implementation below.
 (If you've never used PyTorch before, there are some tutorials [here](https://pytorch.org/tutorials/). You're also welcome to implement these experiments in
 any other framework of your choosing.)
