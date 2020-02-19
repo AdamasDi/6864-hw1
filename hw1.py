@@ -133,15 +133,17 @@ we're interested in seeing how much representations learned from *unlabeled* rev
 """
 
 def word_featurizer(xs):
+    print(xs.shape)
   # normalize
-  return xs / np.sqrt((xs ** 2).sum(axis=1, keepdims=True))
+    return xs / np.sqrt((xs ** 2).sum(axis=1, keepdims=True))
 
 def lsa_featurizer(xs):
   # This function takes in a matrix in which each row contains the word counts
   # for the given review. It should return a matrix in which each row contains
   # the learned feature representation of each review (e.g. the sum of LSA 
   # word representations).
-  feats = transform_tfidf(xs).copy() # Your code here!
+  feats = transform_tfidf(xs).copy()  # Your code here!
+  print(feats.shape)
   # normalize
   return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
 
@@ -164,15 +166,15 @@ def training_experiment(name, featurizer, n_train):
   print(f"{name} features, {n_train} examples")
   train_xs = vectorizer.transform(train_reviews[:n_train])
   train_ys = train_labels[:n_train]
-  test_xs = vectorizer.transform(test_reviews)
-  test_ys = test_labels
+  # test_xs = vectorizer.transform(test_reviews)
+  # test_ys = test_labels
   model = train_model(featurizer, train_xs, train_ys)
-  eval_model(model, featurizer, test_xs, test_ys)
-  print()
+  # eval_model(model, featurizer, test_xs, test_ys)
+  # print()
 
-training_experiment("word", word_featurizer, 10)
-training_experiment("lsa", lsa_featurizer, 10)
-training_experiment("combo", combo_featurizer, 10)
+# training_experiment("word", word_featurizer, 10)
+# training_experiment("lsa", lsa_featurizer, 10)
+# training_experiment("combo", combo_featurizer, 10)
 
 """**Part 1: Lab writeup**
 
@@ -220,15 +222,28 @@ class Word2VecModel(nn.Module):
 
     def __init__(self, vocab_size, embed_dim):
         super().__init__()
+        self.embeddings = nn.Embedding(vocab_size, embed_dim)
+        self.linear1 = nn.Linear(2*2*embed_dim, 64)
+        self.linear2 = nn.Linear(64, vocab_size)
 
-        # Your code here!
-
-     def forward(self, context):
+    def forward(self, context):
         # Context is an `n_batch x n_context` matrix of integer word ids
         # this function should return a set of scores for predicting the word
         # in the middle of the context
+        embedded = self.embeddings(context)
+        embedded = embedded.view(-1, self.num_flat_features(embedded))
+        hid = F.relu(self.linear1(embedded))
+        out = self.linear2(hid)
+        log_probs = F.log_softmax(out)
+        return log_probs
 
-        # Your code here!
+    def num_flat_features(self, x):
+        size = x.size()[1:]  # all dimensions except the batch dimension
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
+
 
 def learn_reps_word2vec(corpus, window_size, rep_size, n_epochs, n_batch):
     # This method takes in a corpus of training sentences. It returns a matrix of
@@ -242,54 +257,69 @@ def learn_reps_word2vec(corpus, window_size, rep_size, n_epochs, n_batch):
 
     ngrams = lab_util.get_ngrams(tokenized_corpus, window_size)
 
-    device = torch.device('cuda')  # run on colab gpu
-    model = Word2VecModel(tokenizer.vocab_size, rep_size).to(device)
+    # device = torch.device('cuda')  # run on colab gpu
+    # model = Word2VecModel(tokenizer.vocab_size, rep_size).to(device)
+    model = Word2VecModel(tokenizer.vocab_size, rep_size)
     opt = optim.Adam(model.parameters(), lr=0.001)
-    loss_fn = None # Your code here
+    loss_fn = nn.NLLLoss()
 
     loader = torch_data.DataLoader(ngrams, batch_size=n_batch, shuffle=True)
 
     for epoch in range(n_epochs):
         for context, label in loader:
-        # as described above, `context` is a batch of context word ids, and
-        # `label` is a batch of predicted word labels
-            pass
-        # Your code here!
+            # as described above, `context` is a batch of context word ids, and
+            # `label` is a batch of predicted word labels
+            # Your code here!
+            model.zero_grad()
+            log_probs = model(context)
+            loss = loss_fn(log_probs, label)
 
-  # reminder: you want to return a `vocab_size x embedding_size` numpy array
-    embedding_matrix = None
-  # Your code here!
+            loss.backward()
+            opt.step()
+    # reminder: you want to return a `vocab_size x embedding_size` numpy array
+    embedding_matrix = model.embeddings.weight
+    embedding_matrix = embedding_matrix.detach().numpy()
+    return embedding_matrix
 
+
+# corpus = train_reviews
+# window_size, rep_size, n_epochs, n_batch = 2, 500, 10, 100
 reps_word2vec = learn_reps_word2vec(train_reviews, 2, 500, 10, 100)
 
-"""After training the embeddings, we can try to visualize the embedding space to see if it makes sense. First, we can take any word in the space and check its closest neighbors."""
+"""After training the embeddings, we can try to visualize the embedding space to see if it makes sense. 
+First, we can take any word in the space and check its closest neighbors."""
 
 lab_util.show_similar_words(vectorizer.tokenizer, reps_word2vec, show_tokens)
 
-"""We can also cluster the embedding space. Clustering in 4 or more dimensions is hard to visualize, and even clustering in 2 or 3 can be difficult because there are so many words in the vocabulary. One thing we can try to do is assign cluster labels and qualitiatively look for an underlying pattern in the clusters."""
+"""We can also cluster the embedding space. Clustering in 4 or more dimensions is hard to visualize, 
+and even clustering in 2 or 3 can be difficult because there are so many words in the vocabulary. 
+One thing we can try to do is assign cluster labels and qualitiatively look for an underlying pattern in the clusters."""
 
-from sklearn.cluster import KMeans
-
-indices = KMeans(n_clusters=10).fit_predict(reps_word2vec)
-zipped = list(zip(range(vectorizer.tokenizer.vocab_size), indices))
-np.random.shuffle(zipped)
-zipped = zipped[:100]
-zipped = sorted(zipped, key=lambda x: x[1])
-for token, cluster_idx in zipped:
-    word = vectorizer.tokenizer.token_to_word[token]
-    print(f"{word}: {cluster_idx}")
+# from sklearn.cluster import KMeans
+#
+# indices = KMeans(n_clusters=10).fit_predict(reps_word2vec)
+# zipped = list(zip(range(vectorizer.tokenizer.vocab_size), indices))
+# np.random.shuffle(zipped)
+# zipped = zipped[:100]
+# zipped = sorted(zipped, key=lambda x: x[1])
+# for token, cluster_idx in zipped:
+#     word = vectorizer.tokenizer.token_to_word[token]
+#     print(f"{word}: {cluster_idx}")
 
 """Finally, we can use the trained word embeddings to construct vector representations of full reviews. 
 One common approach is to simply average all the word embeddings in the review to create an overall embedding. 
 Implement the transform function in Word2VecFeaturizer to do this."""
 
-def lsa_featurizer(xs):
-    feats = None # Your code here!
 
+def lsa_featurizer(xs):
+    # print(xs.shape)
+    feats = np.dot(xs, reps_word2vec)  # Your code here!
   # normalize
     return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
 
+
 training_experiment("word2vec", lsa_featurizer, 10)
+
 
 """**Part 2: Lab writeup**
 
