@@ -178,19 +178,19 @@ def training_experiment(name, featurizer, n_train):
 # training_experiment("lsa", lsa_featurizer, 10)
 # training_experiment("combo", combo_featurizer, 10)
 
-import pandas as pd
-train_num = [10] + [i*100 for i in range(1, 31)]
-word_test = []
-lsa_test = []
-combo_test = []
-for n_train in train_num:
-    word_test.append(training_experiment("word", word_featurizer, n_train))
-    lsa_test.append(training_experiment("lsa", lsa_featurizer, n_train))
-    combo_test.append(training_experiment("combo", combo_featurizer, n_train))
-test_eval = [word_test, lsa_test, combo_test]
-test_eval = np.array(test_eval)
-test_eval_df = pd.DataFrame(test_eval.T, columns=['word', 'lsa', 'combo'], index=train_num)
-test_eval_df.to_csv('./test_eval_750.csv')
+# import pandas as pd
+# train_num = [10] + [i*100 for i in range(1, 31)]
+# word_test = []
+# lsa_test = []
+# combo_test = []
+# for n_train in train_num:
+#     word_test.append(training_experiment("word", word_featurizer, n_train))
+#     lsa_test.append(training_experiment("lsa", lsa_featurizer, n_train))
+#     combo_test.append(training_experiment("combo", combo_featurizer, n_train))
+# test_eval = [word_test, lsa_test, combo_test]
+# test_eval = np.array(test_eval)
+# test_eval_df = pd.DataFrame(test_eval.T, columns=['word', 'lsa', 'combo'], index=train_num)
+# test_eval_df.to_csv('./test_eval_750.csv')
 
 
 """**Part 1: Lab writeup**
@@ -240,8 +240,8 @@ class Word2VecModel(nn.Module):
     def __init__(self, vocab_size, embed_dim):
         super().__init__()
         self.embeddings = nn.Embedding(vocab_size, embed_dim)
-        self.linear1 = nn.Linear(2*2*embed_dim, 64)
-        self.linear2 = nn.Linear(64, vocab_size)
+        self.linear1 = nn.Linear(4*embed_dim, 128)
+        self.linear2 = nn.Linear(128, vocab_size)
 
     def forward(self, context):
         # Context is an `n_batch x n_context` matrix of integer word ids
@@ -295,17 +295,22 @@ def learn_reps_word2vec(corpus, window_size, rep_size, n_epochs, n_batch):
             opt.step()
     # reminder: you want to return a `vocab_size x embedding_size` numpy array
     embedding_matrix = model.embeddings.weight
-    embedding_matrix = embedding_matrix.detach().numpy()
     return embedding_matrix
 
 
 # corpus = train_reviews
 # window_size, rep_size, n_epochs, n_batch = 2, 500, 10, 100
-reps_word2vec = learn_reps_word2vec(train_reviews, 2, 500, 10, 100)
+reps_word2vec = learn_reps_word2vec(train_reviews, 2, 500, 50, 100)
+reps_word2vec = reps_word2vec.cpu()
+reps_word2vec = reps_word2vec.detach().numpy()
+import pickle
+with open('./hw1_cbow_matrix_128_500_50_100.txt', "wb") as fp:
+    pickle.dump(reps_word2vec, fp, -1)
 
 """After training the embeddings, we can try to visualize the embedding space to see if it makes sense. 
 First, we can take any word in the space and check its closest neighbors."""
-
+with open('./hw1_cbow_matrix/cbow_128_500_50_100.txt', "rb") as fp:
+    reps_word2vec = pickle.load(fp)
 lab_util.show_similar_words(vectorizer.tokenizer, reps_word2vec, show_tokens)
 
 """We can also cluster the embedding space. Clustering in 4 or more dimensions is hard to visualize, 
@@ -328,14 +333,14 @@ One common approach is to simply average all the word embeddings in the review t
 Implement the transform function in Word2VecFeaturizer to do this."""
 
 
-def lsa_featurizer(xs):
-    # print(xs.shape)
-    feats = np.dot(xs, reps_word2vec)  # Your code here!
-    # normalize
-    return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
-
-
-training_experiment("word2vec", lsa_featurizer, 10)
+# def word2vec_featurizer(xs):
+#     # print(xs.shape)
+#     feats = np.dot(xs, reps_word2vec)  # Your code here!
+#     # normalize
+#     return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
+#
+#
+# training_experiment("word2vec", word2vec_featurizer, 10)
 
 
 """**Part 2: Lab writeup**
