@@ -46,11 +46,11 @@ with open("./reviews.csv") as reader:
         if n_disp > 5:
             continue
         n_disp += 1
-        print("review:", review)
-        print("rating:", label, "(good)" if label == 1 else "(bad)")
-        print()
+        # print("review:", review)
+        # print("rating:", label, "(good)" if label == 1 else "(bad)")
+        # print()
 
-print(f"Read {len(data)} total reviews.")
+# print(f"Read {len(data)} total reviews.")
 np.random.shuffle(data)
 reviews, labels = zip(*data)
 train_reviews = reviews[:3000]
@@ -71,7 +71,7 @@ left if you want to see how this works).
 vectorizer = lab_util.CountVectorizer()
 vectorizer.fit(train_reviews)
 td_matrix = vectorizer.transform(train_reviews).T
-print(f"TD matrix is {td_matrix.shape[0]} x {td_matrix.shape[1]}")  # (2006, 3000)
+# print(f"TD matrix is {td_matrix.shape[0]} x {td_matrix.shape[1]}")  # (2006, 3000)
 
 '''
 First, implement a function that computes word representations via latent semantic analysis:
@@ -90,9 +90,10 @@ def learn_reps_lsa(matrix, rep_size):
 """Let's look at some representations:"""
 
 reps = learn_reps_lsa(td_matrix.copy(), 500)   # (n_word, rep_size)
-words = ["good", "bad", "cookie", "jelly", "dog", "the", "4"]
+# words = ["good", "bad", "cookie", "jelly", "dog", "the", "4"]
+words = ["good", "dog", "the", "3"]
 show_tokens = [vectorizer.tokenizer.word_to_token[word] for word in words]
-lab_util.show_similar_words(vectorizer.tokenizer, reps, show_tokens)
+# lab_util.show_similar_words(vectorizer.tokenizer, reps, show_tokens)
 
 '''
 We've been operating on the raw count matrix, but in class we discussed several reweighting schemes aimed at making LSA 
@@ -120,8 +121,8 @@ def transform_tfidf(matrix):
 """How does this change the learned similarity function?"""
 
 td_matrix_tfidf = transform_tfidf(td_matrix.copy())
-reps_tfidf = learn_reps_lsa(td_matrix_tfidf, 500)
-lab_util.show_similar_words(vectorizer.tokenizer, reps_tfidf, show_tokens)
+reps_tfidf = learn_reps_lsa(td_matrix_tfidf, 750)
+# lab_util.show_similar_words(vectorizer.tokenizer, reps_tfidf, show_tokens)
 
 """Now that we have some representations, let's see if we can do something useful with them.
 
@@ -133,7 +134,6 @@ we're interested in seeing how much representations learned from *unlabeled* rev
 """
 
 def word_featurizer(xs):
-    print(xs.shape)
   # normalize
     return xs / np.sqrt((xs ** 2).sum(axis=1, keepdims=True))
 
@@ -142,8 +142,7 @@ def lsa_featurizer(xs):
   # for the given review. It should return a matrix in which each row contains
   # the learned feature representation of each review (e.g. the sum of LSA 
   # word representations).
-  feats = transform_tfidf(xs).copy()  # Your code here!
-  print(feats.shape)
+  feats = np.dot(xs, reps_tfidf)  # Your code here!
   # normalize
   return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
 
@@ -160,21 +159,39 @@ def train_model(featurizer, xs, ys):
 def eval_model(model, featurizer, xs, ys):
   xs_featurized = featurizer(xs)
   pred_ys = model.predict(xs_featurized)
-  print("test accuracy", np.mean(pred_ys == ys))
+  test_acc = np.mean(pred_ys == ys)
+  print("test accuracy", test_acc)
+  return test_acc
 
 def training_experiment(name, featurizer, n_train):
   print(f"{name} features, {n_train} examples")
   train_xs = vectorizer.transform(train_reviews[:n_train])
   train_ys = train_labels[:n_train]
-  # test_xs = vectorizer.transform(test_reviews)
-  # test_ys = test_labels
+  test_xs = vectorizer.transform(test_reviews)
+  test_ys = test_labels
   model = train_model(featurizer, train_xs, train_ys)
-  # eval_model(model, featurizer, test_xs, test_ys)
-  # print()
+  test_result = eval_model(model, featurizer, test_xs, test_ys)
+  print()
+  return test_result
 
 # training_experiment("word", word_featurizer, 10)
 # training_experiment("lsa", lsa_featurizer, 10)
 # training_experiment("combo", combo_featurizer, 10)
+
+import pandas as pd
+train_num = [10] + [i*100 for i in range(1, 31)]
+word_test = []
+lsa_test = []
+combo_test = []
+for n_train in train_num:
+    word_test.append(training_experiment("word", word_featurizer, n_train))
+    lsa_test.append(training_experiment("lsa", lsa_featurizer, n_train))
+    combo_test.append(training_experiment("combo", combo_featurizer, n_train))
+test_eval = [word_test, lsa_test, combo_test]
+test_eval = np.array(test_eval)
+test_eval_df = pd.DataFrame(test_eval.T, columns=['word', 'lsa', 'combo'], index=train_num)
+test_eval_df.to_csv('./test_eval_750.csv')
+
 
 """**Part 1: Lab writeup**
 
@@ -314,7 +331,7 @@ Implement the transform function in Word2VecFeaturizer to do this."""
 def lsa_featurizer(xs):
     # print(xs.shape)
     feats = np.dot(xs, reps_word2vec)  # Your code here!
-  # normalize
+    # normalize
     return feats / np.sqrt((feats ** 2).sum(axis=1, keepdims=True))
 
 
@@ -339,3 +356,5 @@ How does changing the context size affect the kinds of representations that are 
 
 5. What are some potential problems with constructing a representation of the review by averaging the embeddings of the individual words?
 """
+
+
